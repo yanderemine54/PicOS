@@ -1,28 +1,36 @@
-; --------------------------------------
-; boot.asm - simple bootloader for PicOS
+;----------------------------------------------
+; boot.asm - Simple bootloader for PicOS
 ; Copyright (C) Yanderemine54 2021
-; --------------------------------------
-    mov ax, 0x07c0
-    mov ds, ax
+;----------------------------------------------
+[ORG 0x7c00]
+KERNEL_OFFSET equ 0x1000
 
-    mov si, msg
-    cld
+    mov [BOOT_DRIVE], dl
+    mov bp, 0x9000
+    mov sp, bp
 
-ch_loop: lodsb
-    or al, al ; 0=end of string
-    jz hang ; finish
-    mov ah, 0x0E
-    mov bh, 0
-    int 0x10
-    jmp ch_loop
+    call load_kernel
+    call switch_to_pm
+    jmp $
 
+%include "gdt.asm"
+%include "disk.asm"
+%include "pm.asm"
 
-hang:
-    jmp hang ; hang
+[BITS 16]
+load_kernel:
+    mov bx, KERNEL_OFFSET
+    mov dh, 2
+    mov dl, [BOOT_DRIVE]
+    call disk_load
+    ret
 
-msg   db 'Starting PicOS...', 13, 10, 0
+[BITS 32]
+BEGIN_PM:
+    call KERNEL_OFFSET
+    jmp $
 
-    times 510-($-$$) db 0 ; write boot sector with zeroes and magic BIOS byte sequence
-    db 0x55
-    db 0xAA
+BOOT_DRIVE db 0
 
+times 510-($-$$) db 0
+dw 0xaa55
